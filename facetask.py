@@ -37,28 +37,8 @@ PATH = os.getcwd()
 """  
                                                                                                                                                                              
 def train(train_dir, model_save_path, n_neighbors=None, knn_algo='ball_tree', verbose=False):
-    """
-    Trains a k-nearest neighbors classifier for face recognition.
-
-    :param train_dir: directory that contains a sub-directory for each known person, with its name.
-
-     (View in source code to see train_dir example tree structure)
-
-     Structure:
-        <train_dir>/
-        ├── <person1>/
-        │   ├── <somename1>.jpeg
-        │   ├── <somename2>.jpeg
-        │   ├── ...
-        ├── <person2>/
-        │   ├── <somename1>.jpeg
-        │   └── <somename2>.jpeg
-        └── ...
-    :param model_save_path: (optional) path to save model of disk
-    :param n_neighbors: (optional) number of neighbors to weigh in classification. Chosen automatically if not specified.
-    :param knn_algo: (optional) underlying data structure to support knn.default is ball_tree
-    :param verbose: verbosity of training
-    :return: returns knn classifier that was trained on the given data."""
+    
+    """Treina o classificador KNN(k-nearest neighbors) para reconhecimento facial"""
     
     X = []
     y = []
@@ -92,15 +72,10 @@ def train(train_dir, model_save_path, n_neighbors=None, knn_algo='ball_tree', ve
     
 def predict(X_img_path,  model_path, knn_clf=None, distance_threshold=0.5):
     """
-    Recognizes faces in given image using a trained KNN classifier
-    :param X_img_path: path to image to be recognized
-    :param knn_clf: (optional) a knn classifier object. if not specified, model_save_path must be specified.
-    :param model_path: (optional) path to a pickled knn classifier. if not specified, model_save_path must be knn_clf.
-    :param distance_threshold: (optional) distance threshold for face classification. the larger it is, the more chance
-           of mis-classifying an unknown person as a known one.
-    :return: a list of names and face locations for the recognized faces in the image: [(name, bounding box), ...].
-        For faces of unrecognized persons, the name 'unknown' will be returned.
+    Utilizando o classificador já treinado, analiza as imagens e tenta reconhecer os rostos
+    Retorna lista de nomes e as coordenadas do rosto
     """
+
     if not os.path.isfile(X_img_path) or os.path.splitext(X_img_path)[1][1:] not in ALLOWED_EXTENSIONS:
         raise Exception("Invalid image path: {}".format(X_img_path))
 
@@ -132,10 +107,7 @@ def predict(X_img_path,  model_path, knn_clf=None, distance_threshold=0.5):
 
 def show_prediction_labels_on_image(img_path, predictions):
     """
-    Shows the face recognition results visually.
-    :param img_path: path to image to be recognized
-    :param predictions: results of the predict function
-    :return:
+    Exibe uma imagem marcando o rosto reconhecido. Recebe o caminho onde a imagem deve ficar e os dados de previsão.
     """
     pil_image = Image.open(img_path).convert("RGB")
     draw = ImageDraw.Draw(pil_image)
@@ -295,7 +267,8 @@ def carregarBanco():
                               tarefater TEXT,
                               tarefaqua TEXT,
                               tarefaqui TEXT,
-                              tarefasex TEXT
+                              tarefasex TEXT,
+                              admin INTEGER
                               );""")
     cursor.close()
     conn.close()
@@ -343,13 +316,7 @@ def inserirComandoDB():
                                                     """    
 
 def central(win, larg, alt):
-    """
-    centers a tkinter window
-    :param win: the root or Toplevel window to center
-    """
-    
-
-    
+    """Centraliza a janela"""    
     width = larg
     frm_width = win.winfo_rootx() - win.winfo_x()
     win_width = width + 2 * frm_width
@@ -368,7 +335,7 @@ def limpa_temp():
         
 def conta_temp():
     DIR = PATH + '/temp_dir'
-    list = os.listdir(DIR) # dir is your directory path
+    list = os.listdir(DIR) 
     number_files = len(list)
     return number_files   
 
@@ -381,16 +348,16 @@ def conta_temp():
 
 class objetoWebcam:
      def __init__(self, video_source=0):
-          # Open the video source
+          # Obtém a Webcam em funcionamento
           self.vid = cv2.VideoCapture(video_source)
           if not self.vid.isOpened():
               raise ValueError("Falha ao abrir webcam:", video_source)
   
-          # Get video source width and height
+          # Obtém altura e largura do vídeo
           self.width = self.vid.get(cv2.CAP_PROP_FRAME_WIDTH)
           self.height = self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT)
  
-     # Release the video source when the object is destroyed
+     # Libera a Webcam após terminar de ser utilizada
      def __del__(self):
          if self.vid.isOpened():
              self.vid.release()
@@ -400,7 +367,7 @@ class objetoWebcam:
         if self.vid.isOpened():
             ret, frame = self.vid.read()
             if ret:
-                  # Return a boolean success flag and the current frame converted to BGR
+                  # Retorna o frame obtido em RGB
                   return (ret, cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             else:
                   return (ret, None)
@@ -480,9 +447,7 @@ class facerecWebCam_tk(tkinter.Toplevel):
                         conn.close()
                 
             
-    def update(self):         # ...
-         # Do work here ...
-         # Get a frame from the video source
+    def update(self):         
         ret, frame = self.vid.tirar_foto()
  
         if ret:
@@ -582,7 +547,6 @@ class facerecEdiUse_tk(tkinter.Toplevel):
         self.selectUser.place(x=60, y=55)
         
         
-        
         conn = sqlite3.connect('usuarios.db')
         cursor = conn.cursor()
 
@@ -591,9 +555,9 @@ class facerecEdiUse_tk(tkinter.Toplevel):
                    """)
 
         for linha in cursor.fetchall():
-            if linha not in self.selectUser['values']:
+            if str(linha) not in self.selectUser['values']:
                 self.selectUser['values'] = (*self.selectUser['values'], linha)
-        self.selectUser.current(1)
+        self.selectUser.current(0)
         conn.close()
         
         
@@ -873,9 +837,9 @@ class facerecAddima_tk(tkinter.Toplevel):
                    """)
 
         for linha in cursor.fetchall():
-            if linha not in self.selectUser['values']:
+            if str(linha) not in self.selectUser['values']:
                 self.selectUser['values'] = (*self.selectUser['values'], linha)
-        self.selectUser.current(1)
+        self.selectUser.current(0)
         conn.close()
         
         
@@ -1029,12 +993,12 @@ class facerecApp_tk(tkinter.Toplevel):
         
         
 
-    def OnButtonTreinarClick(self):     #cria um valor aleatorio entre 1 e 60 e o apresenta no label correto
+    def OnButtonTreinarClick(self):     
         self.changestatus()
         self.update_idletasks()
         train(PATH +'/train_dir/', PATH + '/model/mod.clf')
         self.lblSta.config(text='Status: Ocioso')
-    def OnButtonImaTesteClick(self):     #cria um valor aleatorio entre 1 e 60 e o apresenta no label correto
+    def OnButtonImaTesteClick(self):     
         """self.changestatus()
         self.update_idletasks()
         show_prediction_labels_on_image(PATH + '/test_image2.jpg', predict(PATH + '/test_image2.jpg', PATH + '/model/mod.clf'))
