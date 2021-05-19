@@ -4,16 +4,13 @@ import tkinter
 import cv2
 
 import PIL.Image, PIL.ImageTk
-from tkinter import messagebox
-from tkinter import Toplevel
-from tkinter import filedialog, Checkbutton, IntVar
+from tkinter import messagebox, Toplevel, filedialog, Checkbutton, IntVar
 from datetime import datetime
 from tkinter import ttk
 from math import sqrt
 from sklearn import neighbors
 from shutil import copy2, move
-from random import seed
-from random import randint
+from random import seed, randint
 import os
 import shutil
 from os import listdir
@@ -24,6 +21,8 @@ import face_recognition
 from face_recognition import face_locations
 from face_recognition.face_recognition_cli import image_files_in_folder
 import sqlite3
+
+import facetask_func as func
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 PATH = os.getcwd()
@@ -313,10 +312,10 @@ def inserirComandoDB():
  | |_    | | | | | '_ \   / __|  / _ \   / _ \ / __|
  |  _|   | |_| | | | | | | (__  | (_) | |  __/ \__ \
  |_|      \__,_| |_| |_|  \___|  \___/   \___| |___/
-                                                    """    
+                                                        
 
 def central(win, larg, alt):
-    """Centraliza a janela"""    
+    #Centraliza a janela  
     width = larg
     frm_width = win.winfo_rootx() - win.winfo_x()
     win_width = width + 2 * frm_width
@@ -337,7 +336,7 @@ def conta_temp():
     DIR = PATH + '/temp_dir'
     list = os.listdir(DIR) 
     number_files = len(list)
-    return number_files   
+    return number_files   """
 
 """
       _                          _               
@@ -390,7 +389,7 @@ class facerecWebCam_tk(tkinter.Toplevel):
         
         self.iconbitmap('facetaskico.ico')
         #self.geometry("500x500")
-        central(self, int(self.vid.width), int(self.vid.height)+30)
+        func.central(self, int(self.vid.width), int(self.vid.height)+30)
         self.title("Tire uma foto - FaceTask")
         self.btn_foto=tkinter.Button(self, text="Tirar foto", width=50, command=self.salvar_foto, background='#b3d0e3')
         self.btn_foto.pack(anchor=tkinter.CENTER, expand=True)
@@ -468,13 +467,13 @@ class facerecEdiUse_tk(tkinter.Toplevel):
         tkinter.Toplevel.__init__(self,parent)
         self.parent = parent
         self.geometry("600x300")
-        central(self, 600, 300)
+        func.central(self, 600, 300)
         
         self.configure(background='#b3d0e3')
         self.title("Editar um Usuário - FaceTask")
         self.iconbitmap('facetaskico.ico')
         self.resizable(0,0)
-        limpa_temp()
+        func.limpa_temp(PATH)
         self.initialize()
         self.loadCombo()
         self.selectUser.bind('<<ComboboxSelected>>', self.modified)
@@ -601,12 +600,12 @@ class facerecAddUse_tk(tkinter.Toplevel):
         tkinter.Toplevel.__init__(self,parent)
         self.parent = parent
         #self.geometry("600x300")
-        central(self, 600, 300)
+        func.central(self, 600, 300)
         self.configure(background='#b3d0e3')
         self.title("Adicionar um Usuário - FaceTask")
         self.iconbitmap('facetaskico.ico')
         self.resizable(0,0)
-        limpa_temp()
+        func.limpa_temp(PATH)
         self.initialize()
     
     def initialize(self):    
@@ -664,7 +663,7 @@ class facerecAddUse_tk(tkinter.Toplevel):
     def OnButtonAddUClick(self):
         if self.nomeuser.get()=="":
             messagebox.showinfo("Notificação", "Por favor, digite seu nome.")
-        elif conta_temp()==0:
+        elif func.conta_temp(PATH)==0:
             messagebox.showinfo("Notificação", "Por favor, escolha sua primeira imagem.")
         else:
             seed(datetime.now())
@@ -689,7 +688,7 @@ class facerecEscIma_tk(tkinter.Toplevel):
     def __init__(self,parent):
         tkinter.Toplevel.__init__(self,parent)
         #self.geometry("300x150")
-        central(self, 300, 150)
+        func.central(self, 300, 150)
         self.parent = parent
         self.resizable(0,0)
         self.configure(background='#b3d0e3')
@@ -697,14 +696,14 @@ class facerecEscIma_tk(tkinter.Toplevel):
         self.iconbitmap('facetaskico.ico')
         self.initialize()
     def on_closing(self):
-        limpa_temp()
+        func.limpa_temp(PATH)
         self.destroy()
         
     def initialize(self):    
         self.grid()
         self.lblDig= tkinter.Label(self, text="Escolha como adicionar sua imagem", background='#b3d0e3', font=("Arial",12, 'bold'))
 
-        self.lblCon= tkinter.Label(self, text="Imagens pendentes: " + str(conta_temp()), background='#b3d0e3', font="-size 10 -weight bold")
+        self.lblCon= tkinter.Label(self, text="Imagens pendentes: " + str(func.conta_temp(PATH)), background='#b3d0e3', font="-size 10 -weight bold")
         self.btnAddIma = tkinter.Button(self,text=u"Escolher\n Arquivo", command=self.OnButtonAICarImaClick)
         self.btnAddWC = tkinter.Button(self,text=u"Utilizar\n Webcam", command=self.OnButtonAICarWebClick)
         self.btnSalvar = tkinter.Button(self,text=u"Salvar", command=self.OnButtonSalvarClick)
@@ -723,7 +722,7 @@ class facerecEscIma_tk(tkinter.Toplevel):
        
     def OnButtonAICarImaClick(self):
         copy2(filedialog.askopenfilename(initialdir = PATH + '/',title = "Escolha uma imagem",filetypes = (("Arquivos JPG","*.jpg"),("Arquivos PNG","*.png"),("all files","*.*"))), PATH + '/temp_dir')
-        self.lblCon.config(text="Imagens pendentes: " + str(conta_temp()))
+        self.lblCon.config(text="Imagens pendentes: " + str(func.conta_temp(PATH)))
         
     def OnButtonSalvarClick(self):
         self.destroy()
@@ -732,7 +731,7 @@ class facerecEscIma_tk(tkinter.Toplevel):
     def OnButtonAICarWebClick(self):
         wc = facerecWebCam_tk(self, 1)
         self.wait_window(wc)
-        self.lblCon.config(text="Imagens pendentes: " + str(conta_temp()))
+        self.lblCon.config(text="Imagens pendentes: " + str(func.conta_temp(PATH)))
         #self.pathadd =  PATH+ "/temp.jpg"
         
         #messagebox.showinfo("Notificação", self.selectUser.get())
@@ -748,7 +747,7 @@ class facerecTarefa_tk(tkinter.Toplevel):
         
         self.idmigt=idimg
         #self.geometry("500x300")
-        central(self, 700, 300)
+        func.central(self, 700, 300)
         self.resizable(0,0)
         self.configure(background='#b3d0e3')
         self.title("Tarefa do Dia - FaceTask")
@@ -805,7 +804,7 @@ class facerecAddima_tk(tkinter.Toplevel):
         self.parent = parent
         self.resizable(0,0)
         #self.geometry("350x150")
-        central(self, 350, 150)
+        func.central(self, 350, 150)
         self.initialize()
         self.configure(background='#b3d0e3')
         self.title("Adicionar Imagem - FaceTask")
@@ -852,7 +851,7 @@ class facerecAddima_tk(tkinter.Toplevel):
         self.withdraw()
         self.wait_window(ei)
         self.deiconify()
-        if conta_temp()>0:
+        if func.conta_temp(PATH)>0:
             pathadd = ei.pathadd
             conn = sqlite3.connect('usuarios.db')
             id = get_idDB(conn, self.selectUser.get())
@@ -869,7 +868,7 @@ class facerecMenu_tk(tkinter.Tk):
         tkinter.Tk.__init__(self,parent)
         
         #self.geometry("420x300")
-        central(self, 420, 300)
+        func.central(self, 420, 300)
         self.configure(background='#b3d0e3')
         self.title("Menu Principal - FaceTask")
         self.iconbitmap('facetaskico.ico')
@@ -929,7 +928,7 @@ class facerecApp_tk(tkinter.Toplevel):
         self.parent = parent
         self.resizable(0,0)
         #self.geometry("400x230")
-        central(self, 400, 230)
+        func.central(self, 400, 230)
         self.initialize()
         
         self.iconbitmap('facetaskico.ico')
@@ -1025,7 +1024,7 @@ class facerecApp_tk(tkinter.Toplevel):
 #este é ponto onde o programa se inicia
 #se foi chamado a partir do interpretador python, o _name_  automaticamente será "__main__"
 if __name__ == "__main__":
-    limpa_temp()
+    func.limpa_temp(PATH)
     carregarBanco()
     
  
