@@ -23,320 +23,12 @@ from face_recognition.face_recognition_cli import image_files_in_folder
 import sqlite3
 
 import facetask_func as func
+import facetask_rec as frec
+import facetask_db as dbm
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 PATH = os.getcwd()
 
-"""
-  __  __          _                 _                       _                                                 _                     _                              _           
- |  \/  |   ___  | |_    ___     __| |   ___    ___      __| |   ___     _ __    ___    ___    ___    _ __   | |__     ___    ___  (_)  _ __ ___     ___   _ __   | |_    ___  
- | |\/| |  / _ \ | __|  / _ \   / _` |  / _ \  / __|    / _` |  / _ \   | '__|  / _ \  / __|  / _ \  | '_ \  | '_ \   / _ \  / __| | | | '_ ` _ \   / _ \ | '_ \  | __|  / _ \ 
- | |  | | |  __/ | |_  | (_) | | (_| | | (_) | \__ \   | (_| | |  __/   | |    |  __/ | (__  | (_) | | | | | | | | | |  __/ | (__  | | | | | | | | |  __/ | | | | | |_  | (_) |
- |_|  |_|  \___|  \__|  \___/   \__,_|  \___/  |___/    \__,_|  \___|   |_|     \___|  \___|  \___/  |_| |_| |_| |_|  \___|  \___| |_| |_| |_| |_|  \___| |_| |_|  \__|  \___/ 
-"""  
-                                                                                                                                                                             
-def train(train_dir, model_save_path, n_neighbors=None, knn_algo='ball_tree', verbose=False):
-    
-    """Treina o classificador KNN(k-nearest neighbors) para reconhecimento facial"""
-    
-    X = []
-    y = []
-    for class_dir in listdir(train_dir):
-        if not isdir(join(train_dir, class_dir)):
-            continue
-        for img_path in image_files_in_folder(join(train_dir, class_dir)):
-            image = face_recognition.load_image_file(img_path)
-            faces_bboxes = face_locations(image)
-            if len(faces_bboxes) != 1:
-                if verbose:
-                    print("image {} not fit for training: {}".format(img_path, "didn't find a face" if len(faces_bboxes) < 1 else "found more than one face"))
-                continue
-            X.append(face_recognition.face_encodings(image, known_face_locations=faces_bboxes)[0])
-            y.append(class_dir)
-
-
-    if n_neighbors is None:
-        n_neighbors = int(round(sqrt(len(X))))
-        if verbose:
-            print("Chose n_neighbors automatically as:", n_neighbors)
-
-    knn_clf = neighbors.KNeighborsClassifier(n_neighbors=n_neighbors, algorithm=knn_algo, weights='distance')
-    knn_clf.fit(X, y)
-
-    if model_save_path != "":
-        with open(model_save_path, 'wb') as f:
-            pickle.dump(knn_clf, f)
-    messagebox.showinfo("Notificação", "Classificador treinado!")
-    return knn_clf
-    
-def predict(X_img_path,  model_path, knn_clf=None, distance_threshold=0.5):
-    """
-    Utilizando o classificador já treinado, analiza as imagens e tenta reconhecer os rostos
-    Retorna lista de nomes e as coordenadas do rosto
-    """
-
-    if not os.path.isfile(X_img_path) or os.path.splitext(X_img_path)[1][1:] not in ALLOWED_EXTENSIONS:
-        raise Exception("Invalid image path: {}".format(X_img_path))
-
-    if knn_clf is None and model_path is None:
-        raise Exception("Must supply knn classifier either thourgh knn_clf or model_path")
-
-    # Load a trained KNN model (if one was passed in)
-    if knn_clf is None:
-        with open(model_path, 'rb') as f:
-            knn_clf = pickle.load(f)
-
-    # Load image file and find face locations
-    X_img = face_recognition.load_image_file(X_img_path)
-    X_face_locations = face_recognition.face_locations(X_img)
-
-    # If no faces are found in the image, return an empty result.
-    if len(X_face_locations) == 0:
-        return []
-
-    # Find encodings for faces in the test iamge
-    faces_encodings = face_recognition.face_encodings(X_img, known_face_locations=X_face_locations)
-
-    # Use the KNN model to find the best matches for the test face
-    closest_distances = knn_clf.kneighbors(faces_encodings, n_neighbors=1)
-    are_matches = [closest_distances[0][i][0] <= distance_threshold for i in range(len(X_face_locations))]
-
-    # Predict classes and remove classifications that aren't within the threshold
-    return [(pred, loc) if rec else ("unknown", loc) for pred, loc, rec in zip(knn_clf.predict(faces_encodings), X_face_locations, are_matches)]
-
-def show_prediction_labels_on_image(img_path, predictions):
-    """
-    Exibe uma imagem marcando o rosto reconhecido. Recebe o caminho onde a imagem deve ficar e os dados de previsão.
-    """
-    pil_image = Image.open(img_path).convert("RGB")
-    draw = ImageDraw.Draw(pil_image)
-    conn = sqlite3.connect('usuarios.db')
-
-    for name, (top, right, bottom, left) in predictions:
-        # Draw a box around the face using the Pillow module
-        draw.rectangle(((left, top), (right, bottom)), outline=(0, 0, 255))
-
-        # There's a bug in Pillow where it blows up with non-UTF-8 text
-        # when using the default bitmap font
-        
-        name = get_nameDB(conn, name)
-        name = name.encode("UTF-8")
-
-        # Draw a label with a name below the face
-        text_width, text_height = draw.textsize(name)
-        draw.rectangle(((left, bottom - text_height - 10), (right, bottom)), fill=(0, 0, 255), outline=(0, 0, 255))
-        draw.text((left + 6, bottom - text_height - 5), name, fill=(255, 255, 255, 255))
-
-    # Remove the drawing library from memory as per the Pillow docs
-    del draw
-    conn.close()
-    # Display the resulting image
-    pil_image.show()
-
-"""
-  ____                                         _            ____                _               
- | __ )    __ _   _ __     ___    ___       __| |   ___    |  _ \    __ _    __| |   ___    ___ 
- |  _ \   / _` | | '_ \   / __|  / _ \     / _` |  / _ \   | | | |  / _` |  / _` |  / _ \  / __|
- | |_) | | (_| | | | | | | (__  | (_) |   | (_| | |  __/   | |_| | | (_| | | (_| | | (_) | \__ \
- |____/   \__,_| |_| |_|  \___|  \___/     \__,_|  \___|   |____/   \__,_|  \__,_|  \___/  |___/
-                                                                                                
-"""
-
-def check_allAdmDB(conexao):
-    cursor = conexao.cursor()
-
-    cursor.execute('SELECT nome FROM usuarios WHERE admin=0;')
-    dados = cursor.fetchall()
-    
-    if len(dados)==0:
-        return 1
-    else:
-        return 0
-    
-def check_noAdmDB(conexao):
-    cursor = conexao.cursor()
-
-    cursor.execute('SELECT nome FROM usuarios WHERE admin=1;')
-    dados = cursor.fetchall()
-    
-    if len(dados)==0:
-        return 1
-    else:
-        return 0
-        
-def check_ifAdmDB(conexao, codid):
-    cursor = conexao.cursor()
-    isadm=0
-    cursor.execute('SELECT admin FROM usuarios WHERE id=?;', (codid,))
-    lista = cursor.fetchall()
-    for row in lista:
-        isadm=row[0]
-    
-    cursor.close()
-    return isadm
-    
-def get_nameDB(conexao, codid):
-    nome="undefined"
-    cursor = conexao.cursor()
-
-
-    cursor.execute('SELECT nome FROM usuarios WHERE id=?;', (codid,))
-    lista = cursor.fetchall()
-    for row in lista:
-        nome=row[0]
-    
-    cursor.close()
-    return nome
-
-def get_idDB(conexao, codname):
-    id=0
-    cursor = conexao.cursor()
-
-
-    cursor.execute('SELECT id FROM usuarios WHERE nome=?;', (codname,))
-
-    id= cursor.fetchone()[0]
-    cursor.close()
-    return id
-
-def get_tarDB(conexao, codid):
-    tar='Folga'
-    wekd=''
-    if datetime.today().weekday()==0:
-        wekd='tarefaseg'
-    elif datetime.today().weekday()==1:
-        wekd='tarefater'
-    elif datetime.today().weekday()==2:
-        wekd='tarefaqua'
-    elif datetime.today().weekday()==3:
-        wekd='tarefaqui'
-    elif datetime.today().weekday()==4:
-        wekd='tarefasex'
-    
-    if datetime.today().weekday()<5:
-        cursor = conexao.cursor()
-
-    
-        cursor.execute('SELECT ' + wekd + ' FROM usuarios WHERE id=?;', (codid,))
-
-        tar= cursor.fetchone()[0]
-        cursor.close()
-    return tar
-
-def get_UinfoDB(conexao, codname):
-    tar=[]
-    cursor = conexao.cursor()
-
-    
-    cursor.execute('SELECT * FROM usuarios WHERE nome=?;', (codname,))
-
-    tar= cursor.fetchone()
-    cursor.close()
-    return tar
-    
-def upd_UinfoDB(conexao, codname, nome, tarseg, tarter, tarqua, tarqui, tarsex, admin):
-    
-    cursor = conexao.cursor()
-    
-    cursor.execute("""UPDATE usuarios 
-                   SET nome = ?, tarefaseg=?, tarefater=?, tarefaqua=?, tarefaqui=?, tarefasex=?, admin=?
-                   WHERE nome=?;""", (nome, tarseg, tarter, tarqua, tarqui, tarsex, admin, codname))
-
-    conexao.commit()
-    cursor.close()
-    
-def del_UserDB(conexao, codname):
-    
-    cursor = conexao.cursor()
-    
-    cursor.execute("""DELETE FROM usuarios 
-                   WHERE nome=?;""", (codname,))
-
-    conexao.commit()
-    cursor.close()
-    
-def carregarBanco():
-    conn = sqlite3.connect('usuarios.db')
-    cursor = conn.cursor()
-    cursor.execute("""
-                      CREATE TABLE IF NOT EXISTS usuarios (
-                              id INTEGER NOT NULL PRIMARY KEY ,
-                              nome TEXT UNIQUE NOT NULL,
-                              tarefaseg TEXT,
-                              tarefater TEXT,
-                              tarefaqua TEXT,
-                              tarefaqui TEXT,
-                              tarefasex TEXT,
-                              admin INTEGER
-                              );""")
-    cursor.close()
-    conn.close()
-    print('Banco OK')
-    
-def inserirUserDB(idu, nome, tarseg, tarter, tarqua, tarqui, tarsex, admin):
-    conn = sqlite3.connect('usuarios.db')
-    cursor = conn.cursor()
-
-    # inserindo dados na tabela
-    cursor.execute("""
-                       INSERT INTO usuarios (id, nome, tarefaseg, tarefater, tarefaqua, tarefaqui, tarefasex, admin)
-                       VALUES (?,?,?,?,?,?,?,?)
-                       """, (idu, nome, tarseg, tarter, tarqua, tarqui, tarsex, admin))
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-    print("Comando executado")
-    
-def inserirComandoDB():
-    conn = sqlite3.connect('usuarios.db')
-    cursor = conn.cursor()
-    #cursor.execute("delete from usuarios where id=4525")
-    """lista = [(1, 'JoãoVictor', 'Ia', 'Ybarra', 'Metodos', 'IA2', 'EAD'), 
-             (2, 'Rubens', 'IA', 'Modelagem', 'Luciano', 'IA2', 'TIM'),
-             (3, 'André', 'IA', 'Ybarra', 'Metodos', 'IA2', 'EAD'),
-             (4, 'Robson', 'IA', 'Ybarra', 'Metodos', 'IA2', 'EAD'),
-             (5, 'ProfJoao', 'IA', 'Machine Learning', 'Python', 'IA2', 'App')
-             ]"""
-    cursor.execute("UPDATE usuarios set admin = 1")
-    # inserindo dados na tabela
-    #cursor.executemany("INSERT INTO usuarios (id, nome, tarefaseg, tarefater, tarefaqua, tarefaqui, tarefasex)VALUES (?,?,?,?,?,?,?)", lista)
-
-    conn.commit()
-    
-    print("Comando executado")
-    
-"""
-  _____                                             
- |  ___|  _   _   _ __     ___    ___     ___   ___ 
- | |_    | | | | | '_ \   / __|  / _ \   / _ \ / __|
- |  _|   | |_| | | | | | | (__  | (_) | |  __/ \__ \
- |_|      \__,_| |_| |_|  \___|  \___/   \___| |___/
-                                                        
-
-def central(win, larg, alt):
-    #Centraliza a janela  
-    width = larg
-    frm_width = win.winfo_rootx() - win.winfo_x()
-    win_width = width + 2 * frm_width
-    height = alt
-    titlebar_height = win.winfo_rooty() - win.winfo_y()
-    win_height = height + titlebar_height + frm_width
-    x = win.winfo_screenwidth() // 2 - win_width // 2
-    y = win.winfo_screenheight() // 2 - win_height // 2
-    
-    win.geometry('{}x{}+{}+{}'.format(width, height, x, y))
-    
-def limpa_temp():
-    files = os.listdir(PATH + '/temp_dir')
-    for f in files:
-        os.remove(PATH + '/temp_dir/'+f)
-        
-def conta_temp():
-    DIR = PATH + '/temp_dir'
-    list = os.listdir(DIR) 
-    number_files = len(list)
-    return number_files   """
 
 """
       _                          _               
@@ -406,7 +98,7 @@ class facerecWebCam_tk(tkinter.Toplevel):
             rndid=randint(1, 9999)
             cv2.imwrite(PATH + '/temp_dir/' + str(rndid) + '.jpg', cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
             if self.argwc==0:
-                show_prediction_labels_on_image(PATH+ '/temp_dir/' + str(rndid) + '.jpg', predict(PATH+ '/temp_dir/' + str(rndid) + '.jpg', PATH + '/model/mod.clf'))
+                frec.show_prediction_labels_on_image(PATH+ '/temp_dir/' + str(rndid) + '.jpg', frec.predict(PATH+ '/temp_dir/' + str(rndid) + '.jpg', PATH + '/model/mod.clf'))
             if self.argwc==2:
                 
                 tardi = facerecTarefa_tk(None, rndid)
@@ -416,7 +108,7 @@ class facerecWebCam_tk(tkinter.Toplevel):
                 self.deiconify()
             if self.argwc==3:
                 conn = sqlite3.connect('usuarios.db')
-                predics = predict(PATH+ '/temp_dir/' + str(rndid) + '.jpg', PATH + '/model/mod.clf')
+                predics = frec.predict(PATH+ '/temp_dir/' + str(rndid) + '.jpg', PATH + '/model/mod.clf')
                 try:
                     test = predics[1][0]
                     messagebox.showinfo("Erro", "Mais de uma face foi detectada")
@@ -424,7 +116,7 @@ class facerecWebCam_tk(tkinter.Toplevel):
                 except IndexError:
                     try:
                 
-                        testadm=check_ifAdmDB(conn, predics[0][0])
+                        testadm=dbm.check_ifAdmDB(conn, predics[0][0])
                         if testadm==1:
                             
                             app = facerecApp_tk(None)
@@ -480,7 +172,7 @@ class facerecEdiUse_tk(tkinter.Toplevel):
     
     def modified(self, event):
         conn = sqlite3.connect('usuarios.db')
-        info = get_UinfoDB(conn, self.selectUser.get())
+        info = dbm.get_UinfoDB(conn, self.selectUser.get())
         self.nomeuser.delete(0, "end")
         self.nomeuser.insert(0, info[1])
         self.tarseg.delete(0, "end")
@@ -568,7 +260,7 @@ class facerecEdiUse_tk(tkinter.Toplevel):
         else:
             
             conn = sqlite3.connect('usuarios.db')
-            upd_UinfoDB(conn, self.selectUser.get(), self.nomeuser.get(), self.tarseg.get(), self.tarter.get(), self.tarqua.get(), self.tarqui.get(), self.tarsex.get(), self.checkad.get())
+            dbm.upd_UinfoDB(conn, self.selectUser.get(), self.nomeuser.get(), self.tarseg.get(), self.tarter.get(), self.tarqua.get(), self.tarqui.get(), self.tarsex.get(), self.checkad.get())
             conn.close()
             
             messagebox.showinfo("Notificação", "Usuário atualizado com sucesso.")
@@ -583,9 +275,9 @@ class facerecEdiUse_tk(tkinter.Toplevel):
             escolha = messagebox.askquestion('Atenção', 'Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')
             if escolha == 'yes':
                 conn = sqlite3.connect('usuarios.db')
-                id = get_idDB(conn, self.selectUser.get())
+                id = dbm.get_idDB(conn, self.selectUser.get())
                 shutil.rmtree(PATH + "/train_dir/" + str(id))
-                del_UserDB(conn, self.selectUser.get())
+                dbm.del_UserDB(conn, self.selectUser.get())
                 conn.close()
             
                 messagebox.showinfo("Notificação", "Usuário excluído com sucesso. Treine o classificador para evitar conflitos.")
@@ -670,7 +362,7 @@ class facerecAddUse_tk(tkinter.Toplevel):
             rndid=randint(1, 9999)
             if not os.path.exists(PATH + '/train_dir/' + str(rndid)):
                 try:
-                    inserirUserDB(rndid, self.nomeuser.get(), self.tarseg.get(), self.tarter.get(), self.tarqua.get(), self.tarqui.get(), self.tarsex.get(), self.checkad.get())
+                    dbm.inserirUserDB(rndid, self.nomeuser.get(), self.tarseg.get(), self.tarter.get(), self.tarqua.get(), self.tarqui.get(), self.tarsex.get(), self.checkad.get())
                     os.makedirs(PATH + '/train_dir/' + str(rndid))
                  
                     files = os.listdir(PATH + '/temp_dir')
@@ -757,7 +449,7 @@ class facerecTarefa_tk(tkinter.Toplevel):
     def initialize(self):    
         self.grid()
         conn = sqlite3.connect('usuarios.db')
-        predics = predict(PATH+ '/temp_dir/' + str(self.idmigt) + '.jpg', PATH + '/model/mod.clf')
+        predics = frec.predict(PATH+ '/temp_dir/' + str(self.idmigt) + '.jpg', PATH + '/model/mod.clf')
         try:
             test = predics[1][0]
             self.lblDig= tkinter.Label(self, text="Um erro ocorreu", background='#b3d0e3')
@@ -770,8 +462,8 @@ class facerecTarefa_tk(tkinter.Toplevel):
         except IndexError:
             try:
                 
-                self.nomet=get_nameDB(conn, predics[0][0])
-                self.tarefat=get_tarDB(conn, predics[0][0])
+                self.nomet=dbm.get_nameDB(conn, predics[0][0])
+                self.tarefat=dbm.get_tarDB(conn, predics[0][0])
                 self.lblDig= tkinter.Label(self, text="Bem vindo, " + self.nomet + "!", background='#b3d0e3')
                 self.lblSta= tkinter.Label(self, text="Sua tarefa de hoje é: " + self.tarefat, background='#b3d0e3')
                 self.lblSta.place(x=30,y=150)
@@ -854,7 +546,7 @@ class facerecAddima_tk(tkinter.Toplevel):
         if func.conta_temp(PATH)>0:
             pathadd = ei.pathadd
             conn = sqlite3.connect('usuarios.db')
-            id = get_idDB(conn, self.selectUser.get())
+            id = dbm.get_idDB(conn, self.selectUser.get())
         
             conn.close()
             files = os.listdir(PATH + '/temp_dir')
@@ -903,7 +595,7 @@ class facerecMenu_tk(tkinter.Tk):
         pass
     def OnButtonCarAdmClick(self):
         conn = sqlite3.connect('usuarios.db')
-        if check_allAdmDB(conn)==1 or check_noAdmDB(conn)==1:
+        if dbm.check_allAdmDB(conn)==1 or dbm.check_noAdmDB(conn)==1:
             app = facerecApp_tk(None)
         
             app.configure(background='#b3d0e3')     
@@ -971,7 +663,7 @@ class facerecApp_tk(tkinter.Toplevel):
         pathima =  filedialog.askopenfilename(initialdir = PATH + '/',title = "Escolha uma imagem",filetypes = (("Arquivos JPG","*.jpg"),("Arquivos PNG","*.png"),("all files","*.*")))
         self.changestatus()
         self.update_idletasks()
-        show_prediction_labels_on_image(pathima, predict(pathima, PATH + '/model/mod.clf'))
+        frec.show_prediction_labels_on_image(pathima, frec.predict(pathima, PATH + '/model/mod.clf'))
         self.lblSta.config(text='Status: Ocioso')
         
     def OnButtonAddUseClick(self):
@@ -1000,7 +692,7 @@ class facerecApp_tk(tkinter.Toplevel):
     def OnButtonImaTesteClick(self):     
         """self.changestatus()
         self.update_idletasks()
-        show_prediction_labels_on_image(PATH + '/test_image2.jpg', predict(PATH + '/test_image2.jpg', PATH + '/model/mod.clf'))
+        frec.show_prediction_labels_on_image(PATH + '/test_image2.jpg', frec.predict(PATH + '/test_image2.jpg', PATH + '/model/mod.clf'))
         self.lblSta.config(text='Status: Ocioso')"""
         wc = facerecWebCam_tk(self, 0)
         wc.focus_force()
@@ -1025,10 +717,10 @@ class facerecApp_tk(tkinter.Toplevel):
 #se foi chamado a partir do interpretador python, o _name_  automaticamente será "__main__"
 if __name__ == "__main__":
     func.limpa_temp(PATH)
-    carregarBanco()
+    dbm.carregarBanco()
     
  
-    #inserirComandoDB()
+
     
     menu = facerecMenu_tk(None)
     
