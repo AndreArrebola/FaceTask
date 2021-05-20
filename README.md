@@ -3,12 +3,23 @@
  O **FaceTask** é um programa em **Python** que utiliza *machine learning* para analisar rostos utilizando técnicas e bibliotecas de reconhecimento facial. 
  Basicamente, o sistema analisa múltiplos rostos, utiliza uma câmera conectada ao computador para identificar a pessoa e exibe a ela uma tarefa semanal. 
  
+## 📝 Tabela de Conteúdos
+---------------
+<!--ts-->
+   * [Visão Geral](#visao-geral)
+   * [O que foi utilizado](#util)
+<!--te-->
+
+<a name="visao-geral"/>
+
 ## 💻 Visão Geral
 ---------------
 O programa foi construído para resolver um problema comum em algumas empresas: a divisão de tarefas semanais entre os funcionários. 
 Assim, o sistema é alimentado com os dados de cada usuário, incluindo as tarefas de cada dia da semana e fotos de seu rosto, que podem ser obtidas por webcam ou um seletor de arquivos. 
 Após o cadastro ser feito, ele poderá tirar uma foto utilizando a câmera e exibirá na tela qual será a tarefa do dia.
 O FaceTask está funcional de forma básica, mas ainda pode ser expandido. Então, não é necessariamente um programa concluído, mas pode ser utilizado sem maiores problemas como está.
+
+<a name="util"/>
 
 ## 📦 O que foi utilizado
 ---------------
