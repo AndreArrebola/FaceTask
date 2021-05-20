@@ -10,6 +10,8 @@ from os import listdir
 from os.path import isdir, join, isfile, splitext
 from PIL import Image, ImageFont, ImageDraw, ImageEnhance
 from shutil import copy2, move
+from random import seed, randint
+from datetime import datetime
 
 import facetask_func as func
 import facetask_rec as frec
