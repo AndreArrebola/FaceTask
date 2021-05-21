@@ -28,7 +28,7 @@ O FaceTask está funcional de forma básica, mas ainda pode ser expandido e poss
    * **Bibliotecas de machine learning e reconhecimento facial:** [Dlib](https://github.com/davisking/dlib), [OpenCV](https://github.com/opencv/opencv), [scikit-learn](https://github.com/scikit-learn/scikit-learn), [face_recognition](https://github.com/ageitgey/face_recognition) 
    * **Editores de texto:** [Spyder](https://www.spyder-ide.org) e [VS Code](https://code.visualstudio.com)
    * **Ambientes virtuais:** [Anaconda](https://www.anaconda.com
-   )(Windows), [VMWare Player](https://www.vmware.com/br/products/workstation-player.html)(Linux). Suporte a Docker planejado(somente Linux)
+   )(Windows), [VMWare Player](https://www.vmware.com/br/products/workstation-player.html)(Linux). Outro tipo de ambiente para Linux está sendo estudado.
 
 <!--te-->
 
